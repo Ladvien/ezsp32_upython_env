@@ -11,8 +11,10 @@ firmware_file_name          = 'tinypico-idf4-20200526-unstable-v1.12-464-gcae77d
 
 # Download tools
 os.system('pip install esptool pyserial glob')
-os.system(f'wget https://micropython.org/resources/firmware/{firmware_file_name}')
-os.system('wget https://raw.githubusercontent.com/Ladvien/ramps_controller/master/ramps_controller/serial_util.py')
+if not os.path.exists(firmware_file_name):
+    os.system(f'wget https://micropython.org/resources/firmware/{firmware_file_name}')
+if not os.path.exists('serial_util.py'):
+    os.system('wget https://raw.githubusercontent.com/Ladvien/ramps_controller/master/ramps_controller/serial_util.py')
 
 # Grab some code I wrote (or stole? I cant remember) for a different project.
 from serial_util import *
