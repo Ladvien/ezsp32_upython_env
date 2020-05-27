@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+esp32-idf*.bin
 
 # Distribution / packaging
 .Python
