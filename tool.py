@@ -1,10 +1,21 @@
+#!/usr/bin/env python3
+
+
+"""
+Install uPython on ESP8266
+esptool.py --port /dev/tty.usbserial-14340 --baud 460800 write_flash --flash_size=detect -fm dio 0 esp8266-20191220-v1.12.bin 
+"""
+
 import os
 import time
+import urllib
+import time
+import urllib.request
 
 ##############
 # Parameters
 ##############
-firmware_file_name          = 'esp32-idf4-20200527-unstable-v1.12-464-gcae77daf0.bin'   
+firmware_file_name          = 'esp32-idf4-20191220-v1.12.bin'   
 esp32_mount_dir             = ''   
  
 #################
@@ -18,10 +29,16 @@ esp32_mount_dir             = ''
 # Ampy
 # ampy -p /dev/ttyUSB0 -b 115200 run esp32/test.py
 
+def get_firmware(url, filename):
+    print('Beginning file download with urllib2...')
+    print(url)
+    urllib.request.urlretrieve(url, filename)
+
 # Download tools
 os.system('pip install esptool pyserial mpy-utils --quiet')
 if not os.path.exists(firmware_file_name):
-    os.system(f'wget https://micropython.org/resources/firmware/{firmware_file_name}')
+    print("here")
+    get_firmware(f'https://micropython.org/resources/firmware/{firmware_file_name}', firmware_file_name)
 if not os.path.exists('serial_util.py'):
     os.system('wget https://raw.githubusercontent.com/Ladvien/ramps_controller/master/ramps_controller/serial_util.py')
 
