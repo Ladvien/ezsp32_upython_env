@@ -93,39 +93,3 @@ class ADXL345:
 
     def readByte(self, addr):
         return self.i2c.readfrom_mem(self.slvAddr, addr, 1)
-
-
-
-class SpiritLevel:
-
-    def __init__(self, adxl345: ADXL345, callback, x_threshold: int, y_threshold: int, z_threshold: int):
-        self.adxl345 = adxl345
-        self.x_disturbance = 0
-        self.y_disturbance = 0
-        self.z_disturbance = 0
-
-        self.x_threshold = x_threshold
-        self.y_threshold = y_threshold
-        self.z_threshold = z_threshold
-
-        self.not_level_callback = callback
-
-    def calculate(self):
-        x, y, z = self.adxl345.readXYZ()
-        if abs(x) > self.x_threshold or abs(y) > self.y_threshold or abs(z) > self.z_threshold:
-            self.not_level_callback(x, y, z)
-
-def on_not_level(x: int, y: int, z: int):
-    print("Not level")
-    print('x:', x, 'y:', y, 'z:',z ,'uint:mg')
-
-a345 = ADXL345(5, 4, 0)
-dd = SpiritLevel(a345, on_not_level, 300, 300, 300)
-while True:
-    dd.calculate()
-    # x, y, z = a345.readXYZ()
-    # print('x:', x, 'y:', y, 'z:',z ,'uint:mg')
-    time.sleep(0.1)
-
-
-
