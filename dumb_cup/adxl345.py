@@ -17,11 +17,8 @@ class ADXL345:
     OFSY                  = 0x1f
     OFSZ                  = 0x20
 
-    def __init__(self, scl, sda, cs):
-        self.scl = Pin(scl)
-        self.sda = Pin(sda)
-        self.cs = Pin(cs)
-        self.i2c = I2C(scl = self.scl, sda = self.sda, freq = 20000, timeout = 2000)
+    def __init__(self, i2c):
+        self.i2c = i2c
         self.x_offset = 0
         self.y_offset = 0
         self.z_offset = 0
