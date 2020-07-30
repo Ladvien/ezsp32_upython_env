@@ -24,7 +24,6 @@ class ADXL345:
         self.z_offset = 0
 
         dev = self.i2c.scan()
-        print(dev)
 
         for s in dev:
             buf = self.i2c.readfrom_mem(s, 0, 1)
@@ -55,7 +54,7 @@ class ADXL345:
         self.i2c.writeto_mem(self.DEVICE_ADDR, self.POWER_CTL, b'\x28')
         print("Warming up...")
         time.sleep(1)
-        print("Ready.")
+        print("ADXL345 ready.")
 
         self.x_offset, self.y_offset, self.z_offset = self.calibrate()
 
