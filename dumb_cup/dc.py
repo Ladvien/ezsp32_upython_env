@@ -8,8 +8,9 @@ from dumb_cup.spirit_level import SpiritLevel
 # Constants
 ###############
 
+OZ_FULL             = const(16)
 INIT_SAMPES         = const(50)
-NUM_SAMPLES         = const(50)
+NUM_SAMPLES         = const(15)
 RND_PLCS            = const(1)
 DE_BNC_DELAY        = const(250)
 
@@ -37,17 +38,22 @@ SETTINGS_DIR_NAME   = "/dumb_cup"
 ###############
 # Methods
 ###############
+def map_val(x, in_min, in_max, out_min, out_max):
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
 def on_not_level(x: int, y: int, z: int):
     print("Not level")
     print('x:', x, 'y:', y, 'z:',z ,'uint:mg')
 
 
 def measure(tof: ADXL345, num_samples: int, round_num: int) -> int:
+    global vol_cof
     samples = []    
     # if len(samples) >= NUM_SAMPLES + 1: samples.pop(0)
     for i in range(num_samples):
         samples.append(tof.read())
-        dist = sum(samples) / len(samples)
+        dist = sum(samples) / len(samples) * vol_cof
+    dist = map_val(dist, empty_val, full_val, 0, OZ_FULL)
     return round(dist, round_num)
 
 def blink(led, num: int = 1, delay: int = 200):
@@ -111,8 +117,8 @@ def on_btn(pin):
             
             # Let the user know we are getting the 
             # depth of the cup.
-            blink(led, 5, 300)
             print("Getting measurements when empty.")
+            blink(led, 5, 300)
             empty = measure(tof, NUM_SAMPLES, RND_PLCS)
             fs_write_val("empty", empty)
             
@@ -122,8 +128,8 @@ def on_btn(pin):
 
             # Let the user know we are getting the 
             # depth of the cup.
-            blink(led, 5, 300)
             print("Getting measurements when full.")
+            blink(led, 5, 300)
             full = measure(tof, NUM_SAMPLES, RND_PLCS)
             fs_write_val("full", full)
 
@@ -131,10 +137,15 @@ def on_btn(pin):
         elif btn_state == BTN_ACTION_IN_PRG:
             print("Busy")
 
+
 def erase_cali():
     import os
     filepath = SETTINGS_DIR_NAME + "/" + CALI_F_NAME
-    os.remove(filepath)
+    try:
+        with open(filepath) as f:
+            os.remove(filepath)
+    except:
+        pass
 
 
 def fs_write_val(key: str, value: str):
@@ -158,17 +169,38 @@ def fs_write_val(key: str, value: str):
 
 def fs_read_cali():
     import os
-    CALI_F_NAME         = "calibration.txt"
-    SETTINGS_DIR_NAME   = "/dumb_cup"
     
     filepath = SETTINGS_DIR_NAME + "/" + CALI_F_NAME
 
     with open(filepath, "r") as f:
-        print(f.readlines())
+        return f.readlines()
+    return []
+
+def uninstall():
+    import os
+    os.chdir("dumb_cup")
+    for item in os.listdir():
+        print(type(item))
+        try:
+            os.remove(item)
+        except:
+            os.rmdir(item)
 
 btn_state = BTN_UNPRESSED
 btn.irq(on_btn)
 
+#####################
+# Volume coefficient
+#####################
+def vol_cof():
+    lines = fs_read_cali()
+    for value in lines:       
+        if "empty" in value: 
+            empty_val = float(value.split("=")[1][0:-1])
+        elif "full" in value:
+            full_val = float(value.split("=")[1][0:-1])
+    return (empty_val, full_val)
+    
 #####################
 # Check Liquid Level
 #####################
@@ -178,7 +210,7 @@ def chk_liq_lvl(timer):
     global consumed
     global tof
     cur_lvl = measure(tof, NUM_SAMPLES, RND_PLCS)
-    delta = round(cur_lvl - old_lvl, RND_PLCS)
+    delta = round((cur_lvl - old_lvl), RND_PLCS)
     consumed += round(delta, RND_PLCS)
     print("Current: {} Delta: {} Consumed: {}".format(cur_lvl, delta, consumed))
     old_lvl = cur_lvl
@@ -186,6 +218,11 @@ def chk_liq_lvl(timer):
 ###############
 # Calibration
 ###############
+
+empty_val, full_val = vol_cof()
+volume = (full_val - empty_val) * -1
+vol_cof = OZ_FULL / volume
+
 print("Initializing liquid gauge...")
 cur_lvl = measure(tof, INIT_SAMPES, RND_PLCS)
 old_lvl = cur_lvl
@@ -193,7 +230,7 @@ consumed = 0
 
 print("Initial liquid level: {}".format(cur_lvl))
 chk_liq_lvl_tmr = Timer(CHK_LVL_TMR)
-chk_liq_lvl_tmr.init(mode=Timer.PERIODIC, period=1000, callback=chk_liq_lvl)
+chk_liq_lvl_tmr.init(mode=Timer.PERIODIC, period=3000, callback=chk_liq_lvl)
 
 
 # To begin conversion we need a calibration sequence.
