@@ -1,10 +1,31 @@
 
 import time
-
 from machine import I2C, Pin, Timer
 from dumb_cup.v53l0x import VL53L0X
 from dumb_cup.adxl345 import ADXL345
 from dumb_cup.spirit_level import SpiritLevel
+
+###############
+# Constants
+###############
+
+NUM_SAMPLES     = const(50)
+ROUND_SAMPLES   = const(2)
+DE_BNC_DELAY    = const(250)
+
+RESET_BTN       = const(26)
+DE_BNC_TMR      = const(0)
+CHK_LVL_TMR     = const(1)
+
+SCL_PIN         = const(21)
+SDA_PIN         = const(22)
+
+X_THRESH        = const(300)
+Y_THRESH        = const(300)
+Z_THRESH        = const(300)
+
+CALI_F_NAME         = "calibration.txt"
+SETTINGS_DIR_NAME   = "/dump_cup"
 
 ###############
 # Methods
@@ -22,11 +43,67 @@ def measure(tof: ADXL345, num_samples: int, round_num: int) -> int:
         dist = sum(samples) / len(samples)
     return round(dist, round_num)
 
+################
+# Initialization 
+################
+i2c = I2C(scl = Pin(SCL_PIN), sda = Pin(SDA_PIN), freq = 20000, timeout = 2000)
+
+a345 = ADXL345(i2c)
+dd = SpiritLevel(a345, on_not_level, X_THRESH, Y_THRESH, Z_THRESH)
+
+tof = VL53L0X(i2c)
+tof.set_Vcsel_pulse_period(tof.vcsel_period_type[0], 18)
+tof.set_Vcsel_pulse_period(tof.vcsel_period_type[1], 14)
+
+tof.start()
+
+###############
+# Calibration
+###############
+rst_btn = Pin(RESET_BTN, Pin.IN, Pin.PULL_DOWN)
+
+de_bnc_tmr = Timer(DE_BNC_TMR)
+
+de_bnc_flag = False
+def dnc_timer_expr(timer):
+    global de_bnc_flag
+    de_bnc_flag = False
+
+def calibrate_btn(pin):
+    global tof
+    global de_bnc_flag
+    global cali_file
+    if not de_bnc_flag:
+        # Turn on debounce timer.
+        de_bnc_flag = True
+        de_bnc_tmr.init(mode=Timer.ONE_SHOT, period=DE_BNC_DELAY, callback=dnc_timer_expr)
+        
+        print("Starting calibration....")
+        calibrate(tof, NUM_SAMPLES, ROUND_SAMPLES)        
+
+def calibrate(tof: ADXL345, num_samples: int, round_num: int):
+    import os
+    
+    filepath = SETTINGS_DIR_NAME + "/" + CALI_F_NAME
+    
+    try:
+        with open(filepath, "r") as f:
+            pass
+    except OSError:
+        os.mkdir(SETTINGS_DIR_NAME)
+    
+    try:
+        with open(filepath, "w") as f:
+            f.write("Calibration settings.")
+    except OSError:
+        print("FS error.")
+
+rst_btn.irq(calibrate_btn)
+
 #####################
 # Check Liquid Level
 #####################
 def chk_liq_lvl(timer):
-    NUM_SAMPLES = 100
     global old_lvl
     global cur_lvl
     global tof
@@ -36,26 +113,16 @@ def chk_liq_lvl(timer):
     old_lvl = cur_lvl
 
 ###############
-# Initialize
+# Calibration
 ###############
-i2c = I2C(scl = Pin(21), sda = Pin(22), freq = 20000, timeout = 2000)
-
-a345 = ADXL345(i2c)
-dd = SpiritLevel(a345, on_not_level, 300, 300, 300)
-
-tof = VL53L0X(i2c)
-tof.set_Vcsel_pulse_period(tof.vcsel_period_type[0], 18)
-tof.set_Vcsel_pulse_period(tof.vcsel_period_type[1], 14)
-
-tof.start()
-
 print("Initializing liquid gauge...")
 cur_lvl = measure(tof, 40, 3) * -1
 old_lvl = cur_lvl
 
 print("Initial liquid level: {}".format(cur_lvl))
-chk_liq_lvl_tmr = Timer(0)
+chk_liq_lvl_tmr = Timer(CHK_LVL_TMR)
 chk_liq_lvl_tmr.init(mode=Timer.PERIODIC, period=1000, callback=chk_liq_lvl)
+
 
 # To begin conversion we need a calibration sequence.
 #   1. Have the user empty the cup and level it on counter.
